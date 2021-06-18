@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System</title>
+    <style>
+        *{
+            margin: 0;
+            padding: 0;
+        }
+        .info{
+            z-index: 1;
+            color: greenyellow;
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <p>Клик | Поворот</p>
+        <p>Пробел | Посмотреть на солнце</p>
+        <p>W | вперёд </p>
+        <p>S | назад </p>
+        <p>Пробел | Если не запускается </p>
+        <p>Масштабы не сохранены | У Сатурна нет колец</p>
+    </div>
+    <script src="three.min.js"></script>
+    <script>
+        const scene = new THREE.Scene();
+        const loader = new THREE.TextureLoader();
+        const texture = loader.load(
+            "2k_stars.jpg",
+            () => {
+                const rt = new THREE.WebGLCubeRenderTarget(texture.image.height);
+                rt.fromEquirectangularTexture(renderer, texture);
+                scene.background = rt.texture;
+        });
+
+
+        const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 5000 );     
+        camera.position.z = 200;
+        camera.lookAt(0,0,0);
+
+
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        document.body.appendChild( renderer.domElement );
+
+        
+
+        const dir = { x: 0, y: 0, z: -5 };
+        let alpha, beta, isDown = false;
+        document.body.addEventListener("mousemove", (e) => {
+            const i1 = e.clientX - innerWidth/2;
+            const i2 = e.clientY - innerHeight/2;
+            alpha = (-i1*2/innerWidth)*0.05;
+            beta = (-i2*2/innerHeight)*0.05;
+        });
+
+        document.body.addEventListener("mousedown", () => {
+            isDown = true;
+        });
+
+        document.body.addEventListener("mouseup", () => {
+            isDown = false;
+        });
+
+
+        let cameraSpeed = 0;
+        document.body.addEventListener("keydown", (e) => {
+            if(e.code === "KeyW") cameraSpeed = 1;
+            if(e.code === "KeyS") cameraSpeed = -1;
+            if(e.code === "Space") {
+                camera.lookAt(0,0,0);
+                const sum = Math.abs(camera.position.x) + Math.abs(camera.position.y) + Math.abs(camera.position.z);
+                dir.x = -camera.position.x*5/sum;
+                dir.y = -camera.position.y*5/sum;
+                dir.z = -camera.position.z*5/sum;
+            }         
+        });
+
+        document.body.addEventListener("keyup", (e) => {
+            if(e.code === "KeyW" || e.code === "KeyS") cameraSpeed = 0;
+        });
+
+        window.addEventListener('resize', onWindowResize, false );
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize( window.innerWidth, window.innerHeight );
+        }
+
+
+
+        const sun = new THREE.Mesh(
+            new THREE.SphereGeometry( 109, 100, 100 ),
+            new THREE.MeshBasicMaterial( {map: new THREE.TextureLoader().load( './2k_sun.jpg' )} )
+        );
+        scene.add( sun );
+        const light = new THREE.PointLight( 0xffffff, 1 );
+        scene.add( light );
+
+        
+
+
+        class Planet{
+            constructor(r, url, orbitalSpeed, speedAroundStar, angle, maxCoords) {
+                this.planet = new THREE.Mesh(
+                    new THREE.SphereGeometry( r, 50, 50 ),
+                    new THREE.MeshLambertMaterial( {map: new THREE.TextureLoader().load( url )} )
+                );
+                this.orbitalSpeed = orbitalSpeed;
+                this.speedAroundStar = speedAroundStar;
+                this.angle = angle;
+                this.maxCoords = maxCoords;
+            }
+
+            update() {
+                this.planet.rotation.y += this.orbitalSpeed;
+                this.angle += this.speedAroundStar;
+                this.planet.position.x = Math.cos(this.angle)*this.maxCoords.x;
+                this.planet.position.z = Math.sin(this.angle)*this.maxCoords.z;
+            }
+        }
+
+        const planets = [
+            new Planet(0.33*7, "./2k_mercury.jpg", 0.0113, -0.0113, 0, {x: 150, z: 150}),
+            new Planet(0.95*7, "./2k_venus_surface.jpg", 0.00445, -0.00445, 1, {x: 200, z: 200}),
+            new Planet(1*7, "./2k_earth_daymap.jpg", 0.00273, -0.00273, 0, {x: 250, z: 250}),
+            new Planet(0.53*7, "./2k_mars.jpg", 0.01, -0.00136, 1.2, {x: 300, z: 300}),
+            new Planet(11.21*7, "./2k_jupiter.jpg", 0.000243, -0.000243, 0, {x: 400, z: 400}),
+            new Planet(9.45*7, "./2k_saturn.jpg", 0.0000944, -0.0000944, Math.PI, {x: 600, z: 600}),
+            new Planet(4.01*7, "./2k_uranus.jpg", 0.000033, -0.000033, Math.PI*3.5/2, {x: 750, z: 750}),
+            new Planet(3.88*7, "./2k_neptune.jpg", 0.000016, -0.000016, Math.PI*2.5/2, {x: 850, z: 850}),
+        ];
+
+        planets.forEach(item => {
+            scene.add( item.planet );
+        });
+
+
+
+
+        function animate() {
+            requestAnimationFrame( animate );
+            renderer.render( scene, camera );
+            sun.rotation.y += 0.001;
+
+            if(alpha !== null && beta !== null && isDown) {    
+                camera.rotation.y += alpha;
+                camera.rotation.x += beta;
+                dir.y = dir.y*Math.cos(beta) - dir.z*Math.sin(beta);
+                dir.z = dir.y*Math.sin(beta) + dir.z*Math.cos(beta);
+                dir.x = dir.x*Math.cos(alpha) + dir.z*Math.sin(alpha);
+                dir.z = -dir.x*Math.sin(alpha) + dir.z*Math.cos(alpha);
+                camera.lookAt(dir.x + camera.position.x, dir.y + camera.position.y, dir.z + camera.position.z);
+            }
+
+            planets.forEach( item => {
+                item.update();
+            });
+
+            if(cameraSpeed) {
+                camera.position.add({x: cameraSpeed*dir.x, y: cameraSpeed*dir.y, z: cameraSpeed*dir.z});
+            }
+        }
+        animate();
+    </script>
+</body>
+</html>
